@@ -60,10 +60,10 @@ export async function POST(
       question,
       transcriptText,
       meeting.summary,
-      meeting.chatMessages.map(msg => ({
-        role: msg.role,
-        content: msg.content,
-      }))
+     meeting.chatMessages.map((msg: any) => ({
+  role: msg.role,
+  content: msg.content,
+}))
     );
 
     // Save chat messages
