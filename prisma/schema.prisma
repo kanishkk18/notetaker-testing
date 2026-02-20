@@ -1,0 +1,138 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+
+  schemas  = ["public", "next-auth"]
+}
+
+//////////////////////////////////////////////////////
+// 🔐 NEXT-AUTH SCHEMA
+//////////////////////////////////////////////////////
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@schema("next-auth")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@schema("next-auth")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+
+  accounts      Account[]
+  sessions      Session[]
+  meetings      Meeting[]
+
+  createdAt     DateTime  @default(now())
+
+  @@schema("next-auth")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@schema("next-auth")
+}
+
+//////////////////////////////////////////////////////
+// 📦 PUBLIC SCHEMA (APP TABLES)
+//////////////////////////////////////////////////////
+
+model Meeting {
+  id            String   @id @default(cuid())
+  userId        String
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Meeting BaaS Data
+  botId         String   @unique  // Make it optional
+  meetingUrl    String
+  meetingName   String?
+  status        MeetingStatus @default(JOINING)
+
+  // Media
+  videoUrl      String?
+  audioUrl      String?
+  thumbnailUrl  String?
+
+  // Content
+  transcript    Json?
+  speakers      String[]
+  summary       String?  @db.Text
+
+  // Metadata
+  startedAt     DateTime?
+  endedAt       DateTime?
+  duration      Int?
+
+  // AI Chat History
+  chatMessages  ChatMessage[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@schema("public")
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  meetingId String
+
+  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  role      String
+  content   String   @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@schema("public")
+}
+
+enum MeetingStatus {
+  JOINING
+  JOINED
+  RECORDING
+  COMPLETED
+  FAILED
+  LEFT
+
+  @@schema("public")
+}
